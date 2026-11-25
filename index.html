@@ -11,7 +11,7 @@
   body { background: #0f1117; color: white; display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; }
   #video-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); opacity: 0.35; z-index: 0; }
   #ui { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%; padding: 8px; gap: 6px; }
-  #display { background: rgba(30, 34, 45, 0.9); border: 2px solid #00dcb4; border-radius: 12px; padding: 12px; font-size: 24px; min-height: 58px; display: flex; align-items: center; word-break: break-all; }
+  #display { background: rgba(30, 34, 45, 0.92); border: 2px solid #00dcb4; border-radius: 12px; padding: 12px; font-size: 24px; min-height: 58px; display: flex; align-items: center; word-break: break-all; }
   .row { display: flex; gap: 4px; flex: 1; justify-content: center; }
   .key { background: rgba(55, 62, 75, 0.92); border: 1px solid #788296; border-radius: 10px; flex: 1; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; text-align: center; user-select: none; }
   .key.active { background: #00b862; border: 2px solid #ffffff; transform: scale(1.04); }
@@ -20,17 +20,16 @@
   .key.calib { background: #9c6615; flex: 1.6; font-size: 12px; }
   .key.sug { background: #285873; flex: 1.5; font-size: 13px; }
   #cursor { position: fixed; width: 28px; height: 28px; border-radius: 50%; background: #00ffb4; border: 3px solid white; pointer-events: none; z-index: 10; transform: translate(-50%, -50%); box-shadow: 0 0 15px #00ffb4; }
-  #ring { position: fixed; width: 56px; height: 56px; border-radius: 50%; border: 4px solid transparent; pointer-events: none; z-index: 9; transform: translate(-50%, -50%); }
+  #ring { position: fixed; width: 58px; height: 58px; border-radius: 50%; border: 4px solid transparent; pointer-events: none; z-index: 9; transform: translate(-50%, -50%); }
   #status-bar { position: fixed; top: 4px; right: 10px; font-size: 11px; color: #00dcb4; z-index: 15; }
 </style>
 </head>
 <body>
 <video id="video-bg" autoplay playsinline muted></video>
-<canvas id="c1" width="80" height="60" style="display:none;"></canvas>
+<canvas id="c1" width="64" height="48" style="display:none;"></canvas>
 <div id="cursor"></div>
 <div id="ring"></div>
-<div id="status-bar">Pornire camera...</div>
-
+<div id="status-bar">Pornire...</div>
 <div id="ui">
   <div id="display"><span id="text"></span><span style="color:#00dcb4">|</span></div>
   <div class="row" id="row-top"></div>
@@ -38,229 +37,41 @@
   <div class="row" id="row-2"></div>
   <div class="row" id="row-3"></div>
 </div>
-
 <script>
-var dict = ["SALUT", "BUNA", "MULTUMESC", "AJUTOR", "APA", "MANCARE", "DA", "NU", "VREAU", "TE ROG", "MA DOARE", "SUNT BINE", "OBOSIT", "SOMN", "FRIG", "CALD"];
-var rows = [
-  ["Q","W","E","R","T","Y","U","I","O","P"],
-  ["A","S","D","F","G","H","J","K","L","STERGE"],
-  ["Z","X","C","V","B","N","M","SPATIU","VORBESTE","GOLESTE"]
-];
-
-var text = "";
-var cx = window.innerWidth / 2;
-var cy = window.innerHeight / 2;
-var refX = 0.5, refY = 0.5;
-var lastFaceX = 0.5, lastFaceY = 0.5;
-var calibrated = false;
-var currentKey = null;
-var hoverStart = 0;
-var DWELL_MS = 1100;
-
-function speak(msg) {
-  if (!msg.trim()) return;
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
-    var u = new SpeechSynthesisUtterance(msg);
-    u.lang = "ro-RO";
-    u.rate = 0.95;
-    window.speechSynthesis.speak(u);
-  }
-}
-
-function getSuggestions() {
-  var parts = text.split(" ");
-  var last = parts[parts.length - 1];
-  if (!last) return ["SALUT", "DA", "NU"];
-  var matches = dict.filter(function(w) { return w.indexOf(last) === 0 && w !== last; });
-  var res = matches.slice(0, 3);
-  var defaults = ["APA", "AJUTOR", "MULTUMESC"];
-  for (var i = 0; i < defaults.length; i++) {
-    if (res.length < 3 && res.indexOf(defaults[i]) === -1) res.push(defaults[i]);
-  }
-  return res;
-}
-
-function makeKey(label, cls, act) {
-  var d = document.createElement("div");
-  d.className = "key " + cls;
-  d.textContent = label;
-  d.setAttribute("data-act", act);
-  return d;
-}
-
-function renderTopRow() {
-  var top = document.getElementById("row-top");
-  top.innerHTML = "";
-  top.appendChild(makeKey("CENTREAZA", "calib", "CALIB"));
-  var sugs = getSuggestions();
-  for (var i = 0; i < sugs.length; i++) {
-    top.appendChild(makeKey(sugs[i], "sug", "SUG:" + sugs[i]));
-  }
-}
-
-function buildKeyboard() {
-  renderTopRow();
-  for (var r = 0; r < rows.length; r++) {
-    var rowEl = document.getElementById("row-" + (r + 1));
-    rowEl.innerHTML = "";
-    for (var c = 0; c < rows[r].length; c++) {
-      var k = rows[r][c];
-      var cls = "";
-      if (k === "VORBESTE" || k === "SPATIU") cls = "special";
-      if (k === "STERGE" || k === "GOLESTE") cls = "danger";
-      rowEl.appendChild(makeKey(k, cls, k));
-    }
-  }
-}
-
-function triggerAction(act) {
-  if (act === "CALIB") {
-    refX = lastFaceX;
-    refY = lastFaceY;
-    cx = window.innerWidth / 2;
-    cy = window.innerHeight / 2;
-  } else if (act.indexOf("SUG:") === 0) {
-    var word = act.slice(4);
-    var parts = text.split(" ");
-    parts[parts.length - 1] = word;
-    text = parts.join(" ") + " ";
-    renderTopRow();
-  } else if (act === "SPATIU") {
-    text += " ";
-    renderTopRow();
-  } else if (act === "STERGE") {
-    text = text.slice(0, -1);
-    renderTopRow();
-  } else if (act === "GOLESTE") {
-    text = "";
-    renderTopRow();
-  } else if (act === "VORBESTE") {
-    speak(text);
-  } else {
-    text += act;
-    renderTopRow();
-  }
-  document.getElementById("text").textContent = text;
-}
-
+var dict = ["SALUT","BUNA","MULTUMESC","AJUTOR","APA","MANCARE","DA","NU","VREAU","TE ROG","MA DOARE","SUNT BINE","OBOSIT","SOMN","FRIG","CALD"];
+var rows = [["Q","W","E","R","T","Y","U","I","O","P"],["A","S","D","F","G","H","J","K","L","STERGE"],["Z","X","C","V","B","N","M","SPATIU","VORBESTE","GOLESTE"]];
+var text = "", cx = window.innerWidth / 2, cy = window.innerHeight / 2, refX = 0.5, refY = 0.5, lastFaceX = 0.5, lastFaceY = 0.5, calibrated = false, currentKey = null, hoverStart = 0, DWELL_MS = 1150;
+function speak(msg) { if (!msg.trim()) return; if ('speechSynthesis' in window) { window.speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(msg); u.lang = "ro-RO"; u.rate = 0.95; window.speechSynthesis.speak(u); } }
+function getSuggestions() { var parts = text.split(" "), last = parts[parts.length - 1]; if (!last) return ["SALUT","DA","NU"]; var res = dict.filter(function(w) { return w.indexOf(last) === 0 && w !== last; }).slice(0, 3); var defs = ["APA","AJUTOR","MULTUMESC"]; for (var i = 0; i < defs.length; i++) { if (res.length < 3 && res.indexOf(defs[i]) === -1) res.push(defs[i]); } return res; }
+function makeKey(label, cls, act) { var d = document.createElement("div"); d.className = "key " + cls; d.textContent = label; d.setAttribute("data-act", act); return d; }
+function renderTopRow() { var top = document.getElementById("row-top"); top.innerHTML = ""; top.appendChild(makeKey("CENTREAZA", "calib", "CALIB")); var sugs = getSuggestions(); for (var i = 0; i < sugs.length; i++) top.appendChild(makeKey(sugs[i], "sug", "SUG:" + sugs[i])); }
+function buildKeyboard() { renderTopRow(); for (var r = 0; r < rows.length; r++) { var rowEl = document.getElementById("row-" + (r + 1)); rowEl.innerHTML = ""; for (var c = 0; c < rows[r].length; c++) { var k = rows[r][c], cls = (k === "VORBESTE" || k === "SPATIU") ? "special" : ((k === "STERGE" || k === "GOLESTE") ? "danger" : ""); rowEl.appendChild(makeKey(k, cls, k)); } } }
+function triggerAction(act) { if (act === "CALIB") { refX = lastFaceX; refY = lastFaceY; cx = window.innerWidth / 2; cy = window.innerHeight / 2; } else if (act.indexOf("SUG:") === 0) { var parts = text.split(" "); parts[parts.length - 1] = act.slice(4); text = parts.join(" ") + " "; renderTopRow(); } else if (act === "SPATIU") { text += " "; renderTopRow(); } else if (act === "STERGE") { text = text.slice(0, -1); renderTopRow(); } else if (act === "GOLESTE") { text = ""; renderTopRow(); } else if (act === "VORBESTE") { speak(text); } else { text += act; renderTopRow(); } document.getElementById("text").textContent = text; }
 function startApp() {
   var status = document.getElementById("status-bar");
-
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    status.textContent = "Necesita HTTPS";
-    return;
-  }
-
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 320 }, height: { ideal: 240 } }, audio: false })
-  .then(function(stream) {
-    var video = document.getElementById("video-bg");
-    video.srcObject = stream;
-    video.play();
-
-    var canvas = document.getElementById("c1");
-    var ctx = canvas.getContext("2d", { willReadFrequently: true });
-    var cursorEl = document.getElementById("cursor");
-    var ringEl = document.getElementById("ring");
-
-    status.textContent = "Miscare Cap Activa";
-
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { status.textContent = "Necesita HTTPS"; return; }
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 320 }, height: { ideal: 240 } }, audio: false }).then(function(stream) {
+    var video = document.getElementById("video-bg"); video.srcObject = stream; video.play();
+    var canvas = document.getElementById("c1"), ctx = canvas.getContext("2d", { willReadFrequently: true }), cursorEl = document.getElementById("cursor"), ringEl = document.getElementById("ring");
+    var hasNative = ('FaceDetector' in window), nativeDet = hasNative ? new FaceDetector({ fastMode: true, maxDetectedFaces: 1 }) : null, busy = false;
+    status.textContent = hasNative ? "Micro-Tracking AI" : "Micro-Tracking Activ";
+    function updatePos(nx, ny) { lastFaceX = nx; lastFaceY = ny; if (!calibrated) { refX = nx; refY = ny; calibrated = true; } var tx = Math.max(15, Math.min(window.innerWidth - 15, ((nx - refX) * 9.5 + 0.5) * window.innerWidth)), ty = Math.max(15, Math.min(window.innerHeight - 15, ((ny - refY) * 10.5 + 0.5) * window.innerHeight)); if (Math.abs(tx - cx) > 6) cx += (tx - cx) * 0.28; if (Math.abs(ty - cy) > 6) cy += (ty - cy) * 0.28; }
     function loop() {
-      if (video.readyState >= 2) {
-        ctx.drawImage(video, 0, 0, 80, 60);
-        var data = ctx.getImageData(0, 0, 80, 60).data;
-        var sumX = 0, sumY = 0, count = 0;
-
-        for (var y = 6; y < 54; y++) {
-          for (var x = 12; x < 68; x++) {
-            var i = (y * 80 + x) * 4;
-            var r = data[i];
-            var g = data[i + 1];
-            var b = data[i + 2];
-
-            // Detectare tonuri de piele in spatiul YCbCr (independent de lumina)
-            var cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
-            var cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
-
-            if (r > 60 && cr >= 133 && cr <= 173 && cb >= 77 && cb <= 127) {
-              sumX += (80 - x);
-              sumY += y;
-              count++;
-            }
-          }
-        }
-
-        if (count > 20) {
-          lastFaceX = (sumX / count) / 80.0;
-          lastFaceY = (sumY / count) / 60.0;
-
-          if (!calibrated) {
-            refX = lastFaceX;
-            refY = lastFaceY;
-            calibrated = true;
-          }
-
-          var tx = ((lastFaceX - refX) * 6.5 + 0.5) * window.innerWidth;
-          var ty = ((lastFaceY - refY) * 7.5 + 0.5) * window.innerHeight;
-
-          tx = Math.max(15, Math.min(window.innerWidth - 15, tx));
-          ty = Math.max(15, Math.min(window.innerHeight - 15, ty));
-
-          if (Math.abs(tx - cx) > 6) cx += (tx - cx) * 0.25;
-          if (Math.abs(ty - cy) > 6) cy += (ty - cy) * 0.25;
-        }
+      if (video.readyState >= 2 && !busy) {
+        if (nativeDet) { busy = true; nativeDet.detect(video).then(function(f) { if (f.length > 0) { var b = f.boundingBox; updatePos(1 - ((b.x + b.width / 2) / video.videoWidth), (b.y + b.height / 2) / video.videoHeight); } busy = false; }).catch(function() { busy = false; }); }
+        else { ctx.drawImage(video, 0, 0, 64, 48); var d = ctx.getImageData(0, 0, 64, 48).data, sx = 0, sy = 0, cnt = 0; for (var y = 6; y < 42; y++) { for (var x = 4; x < 60; x++) { var i = (y * 64 + x) * 4, r = d[i], g = d[i + 1], b = d[i + 2], cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b, cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b; if (r > 65 && cr >= 135 && cr <= 172 && cb >= 78 && cb <= 126) { sx += (64 - x); sy += y; cnt++; } } } if (cnt > 10) updatePos((sx / cnt) / 64.0, (sy / cnt) / 48.0); }
       }
-
-      cursorEl.style.left = cx + "px";
-      cursorEl.style.top = cy + "px";
-      ringEl.style.left = cx + "px";
-      ringEl.style.top = cy + "px";
-
-      var hit = null;
-      var keys = document.querySelectorAll(".key");
-      for (var k = 0; k < keys.length; k++) {
-        var el = keys[k];
-        var r = el.getBoundingClientRect();
-        if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) {
-          el.classList.add("active");
-          hit = el.getAttribute("data-act");
-        } else {
-          el.classList.remove("active");
-        }
-      }
-
+      cursorEl.style.left = cx + "px"; cursorEl.style.top = cy + "px"; ringEl.style.left = cx + "px"; ringEl.style.top = cy + "px";
+      var hit = null, keys = document.querySelectorAll(".key");
+      for (var k = 0; k < keys.length; k++) { var el = keys[k], r = el.getBoundingClientRect(); if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) { el.classList.add("active"); hit = el.getAttribute("data-act"); } else el.classList.remove("active"); }
       var now = performance.now();
-      if (hit) {
-        if (hit !== currentKey) {
-          currentKey = hit;
-          hoverStart = now;
-        } else {
-          var prog = Math.min(1, (now - hoverStart) / DWELL_MS);
-          ringEl.style.borderColor = "#00e6ff";
-          ringEl.style.transform = "translate(-50%, -50%) scale(" + (1.3 - prog * 0.6) + ")";
-          if (prog >= 1) {
-            triggerAction(hit);
-            hoverStart = now + 650;
-          }
-        }
-      } else {
-        currentKey = null;
-        ringEl.style.borderColor = "transparent";
-      }
-
+      if (hit) { if (hit !== currentKey) { currentKey = hit; hoverStart = now; } else { var prog = Math.min(1, (now - hoverStart) / DWELL_MS); ringEl.style.borderColor = "#00e6ff"; ringEl.style.transform = "translate(-50%, -50%) scale(" + (1.3 - prog * 0.6) + ")"; if (prog >= 1) { triggerAction(hit); hoverStart = now + 700; } } } else { currentKey = null; ringEl.style.borderColor = "transparent"; }
       requestAnimationFrame(loop);
     }
     loop();
-  })
-  .catch(function(err) {
-    status.textContent = "Permite camera din browser";
-  });
+  }).catch(function() { status.textContent = "Permite accesul la camera"; });
 }
-
-window.onload = function() {
-  buildKeyboard();
-  startApp();
-};
+window.onload = function() { buildKeyboard(); startApp(); };
 </script>
 </body>
 </html>
