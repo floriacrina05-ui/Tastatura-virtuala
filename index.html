@@ -29,7 +29,7 @@
 <div id="nose-dot"></div>
 <div id="cursor"></div>
 <div id="ring"></div>
-<div id="status-bar">Incarcare AI...</div>
+<div id="status-bar">Se incarca AI...</div>
 <div id="ui">
   <div id="display"><span id="text"></span><span style="color:#00dcb4">|</span></div>
   <div class="row" id="row-top"></div>
@@ -38,24 +38,62 @@
   <div class="row" id="row-3"></div>
 </div>
 
-<script type="module">
-import { FaceLandmarker, FilesetResolver } from "https://jsdelivr.net";
+<script>
+var dict = ["SALUT","BUNA","MULTUMESC","AJUTOR","APA","MANCARE","DA","NU","VREAU","TE ROG","MA DOARE","SUNT BINE","OBOSIT","SOMN","FRIG","CALD"];
+var rows = [["Q","W","E","R","T","Y","U","I","O","P"],["A","S","D","F","G","H","J","K","L","STERGE"],["Z","X","C","V","B","N","M","SPATIU","VORBESTE","GOLESTE"]];
+var text = "", cx = window.innerWidth / 2, cy = window.innerHeight / 2, refX = 0.5, refY = 0.5, smoothX = 0.5, smoothY = 0.5, calibrated = false, currentKey = null, hoverStart = 0, DWELL_MS = 1150;
 
-const dict = ["SALUT","BUNA","MULTUMESC","AJUTOR","APA","MANCARE","DA","NU","VREAU","TE ROG","MA DOARE","SUNT BINE","OBOSIT","SOMN","FRIG","CALD"];
-const rows = [["Q","W","E","R","T","Y","U","I","O","P"],["A","S","D","F","G","H","J","K","L","STERGE"],["Z","X","C","V","B","N","M","SPATIU","VORBESTE","GOLESTE"]];
-let text = "", cx = window.innerWidth / 2, cy = window.innerHeight / 2, refX = 0.5, refY = 0.5, lastX = 0.5, lastY = 0.5, smoothX = 0.5, smoothY = 0.5, calibrated = false, currentKey = null, hoverStart = 0;
-const DWELL_MS = 1150;
-
-function speak(msg) { if (!msg.trim()) return; window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(msg); u.lang = "ro-RO"; u.rate = 0.95; window.speechSynthesis.speak(u); }
-function getSuggestions() { const parts = text.split(" "), last = parts[parts.length - 1]; if (!last) return ["SALUT","DA","NU"]; const res = dict.filter(w => w.indexOf(last) === 0 && w !== last).slice(0, 3); for (const def of ["APA","AJUTOR","MULTUMESC"]) { if (res.length < 3 && res.indexOf(def) === -1) res.push(def); } return res; }
-function makeKey(label, cls, act) { const d = document.createElement("div"); d.className = "key " + cls; d.textContent = label; d.setAttribute("data-act", act); return d; }
-function renderTopRow() { const top = document.getElementById("row-top"); top.innerHTML = ""; top.appendChild(makeKey("CENTREAZA", "calib", "CALIB")); getSuggestions().forEach(s => top.appendChild(makeKey(s, "sug", "SUG:" + s))); }
-function buildKeyboard() { renderTopRow(); rows.forEach((r, idx) => { const rowEl = document.getElementById("row-" + (idx + 1)); rowEl.innerHTML = ""; r.forEach(k => { const cls = (k === "VORBESTE" || k === "SPATIU") ? "special" : ((k === "STERGE" || k === "GOLESTE") ? "danger" : ""); rowEl.appendChild(makeKey(k, cls, k)); }); }); }
-function triggerAction(act) { if (act === "CALIB") { refX = smoothX; refY = smoothY; cx = window.innerWidth / 2; cy = window.innerHeight / 2; } else if (act.indexOf("SUG:") === 0) { const parts = text.split(" "); parts[parts.length - 1] = act.slice(4); text = parts.join(" ") + " "; renderTopRow(); } else if (act === "SPATIU") { text += " "; renderTopRow(); } else if (act === "STERGE") { text = text.slice(0, -1); renderTopRow(); } else if (act === "GOLESTE") { text = ""; renderTopRow(); } else if (act === "VORBESTE") { speak(text); } else { text += act; renderTopRow(); } document.getElementById("text").textContent = text; }
+function speak(msg) { if (!msg.trim()) return; if ('speechSynthesis' in window) { window.speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(msg); u.lang = "ro-RO"; u.rate = 0.95; window.speechSynthesis.speak(u); } }
+function getSuggestions() { var parts = text.split(" "), last = parts[parts.length - 1]; if (!last) return ["SALUT","DA","NU"]; var res = dict.filter(function(w) { return w.indexOf(last) === 0 && w !== last; }).slice(0, 3); var defs = ["APA","AJUTOR","MULTUMESC"]; for (var i = 0; i < defs.length; i++) { if (res.length < 3 && res.indexOf(defs[i]) === -1) res.push(defs[i]); } return res; }
+function makeKey(label, cls, act) { var d = document.createElement("div"); d.className = "key " + cls; d.textContent = label; d.setAttribute("data-act", act); return d; }
+function renderTopRow() { var top = document.getElementById("row-top"); top.innerHTML = ""; top.appendChild(makeKey("CENTREAZA", "calib", "CALIB")); var sugs = getSuggestions(); for (var i = 0; i < sugs.length; i++) top.appendChild(makeKey(sugs[i], "sug", "SUG:" + sugs[i])); }
+function buildKeyboard() { renderTopRow(); for (var r = 0; r < rows.length; r++) { var rowEl = document.getElementById("row-" + (r + 1)); rowEl.innerHTML = ""; for (var c = 0; c < rows[r].length; c++) { var k = rows[r][c], cls = (k === "VORBESTE" || k === "SPATIU") ? "special" : ((k === "STERGE" || k === "GOLESTE") ? "danger" : ""); rowEl.appendChild(makeKey(k, cls, k)); } } }
+function triggerAction(act) { if (act === "CALIB") { refX = smoothX; refY = smoothY; cx = window.innerWidth / 2; cy = window.innerHeight / 2; } else if (act.indexOf("SUG:") === 0) { var parts = text.split(" "); parts[parts.length - 1] = act.slice(4); text = parts.join(" ") + " "; renderTopRow(); } else if (act === "SPATIU") { text += " "; renderTopRow(); } else if (act === "STERGE") { text = text.slice(0, -1); renderTopRow(); } else if (act === "GOLESTE") { text = ""; renderTopRow(); } else if (act === "VORBESTE") { speak(text); } else { text += act; renderTopRow(); } document.getElementById("text").textContent = text; }
 
 buildKeyboard();
 
-async function init() {
+window.actualizeazaNas = function(nx, ny) {
+  var noseEl = document.getElementById("nose-dot");
+  noseEl.style.left = (nx * window.innerWidth) + "px";
+  noseEl.style.top = (ny * window.innerHeight) + "px";
+  if (!calibrated) { refX = nx; refY = ny; smoothX = nx; smoothY = ny; calibrated = true; }
+  smoothX = smoothX * 0.72 + nx * 0.28;
+  smoothY = smoothY * 0.72 + ny * 0.28;
+  var tx = Math.max(15, Math.min(window.innerWidth - 15, ((smoothX - refX) * 6.5 + 0.5) * window.innerWidth));
+  var ty = Math.max(15, Math.min(window.innerHeight - 15, ((smoothY - refY) * 8.0 + 0.5) * window.innerHeight));
+  if (Math.abs(tx - cx) > 10) cx += (tx - cx) * 0.25;
+  if (Math.abs(ty - cy) > 10) cy += (ty - cy) * 0.25;
+};
+
+function buclaUI() {
+  var cursorEl = document.getElementById("cursor"), ringEl = document.getElementById("ring");
+  cursorEl.style.left = cx + "px"; cursorEl.style.top = cy + "px";
+  ringEl.style.left = cx + "px"; ringEl.style.top = cy + "px";
+  var hit = null, keys = document.querySelectorAll(".key");
+  for (var k = 0; k < keys.length; k++) {
+    var el = keys[k], r = el.getBoundingClientRect();
+    if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) { el.classList.add("active"); hit = el.getAttribute("data-act"); }
+    else el.classList.remove("active");
+  }
+  var now = performance.now();
+  if (hit) {
+    if (hit !== currentKey) { currentKey = hit; hoverStart = now; }
+    else {
+      var prog = Math.min(1, (now - hoverStart) / DWELL_MS);
+      ringEl.style.borderColor = "#00e6ff";
+      ringEl.style.transform = "translate(-50%, -50%) scale(" + (1.3 - prog * 0.6) + ")";
+      if (prog >= 1) { triggerAction(hit); hoverStart = now + 700; }
+    }
+  } else { currentKey = null; ringEl.style.borderColor = "transparent"; }
+  requestAnimationFrame(buclaUI);
+}
+buclaUI();
+</script>
+
+<script type="module">
+import { FaceLandmarker, FilesetResolver } from "https://jsdelivr.net";
+
+async function pornesteAI() {
   const status = document.getElementById("status-bar");
   try {
     const video = document.getElementById("video-bg");
@@ -63,7 +101,6 @@ async function init() {
     video.srcObject = stream;
     await video.play();
 
-    status.textContent = "Incarcare model nas...";
     const vision = await FilesetResolver.forVisionTasks("https://jsdelivr.net");
     const landmarker = await FaceLandmarker.createFromOptions(vision, {
       baseOptions: { modelAssetPath: "https://googleapis.com", delegate: "CPU" },
@@ -71,63 +108,25 @@ async function init() {
     });
 
     status.textContent = "AI Nas Activ";
-    const cursorEl = document.getElementById("cursor"), ringEl = document.getElementById("ring"), noseEl = document.getElementById("nose-dot");
     let lastTime = -1;
 
-    function loop() {
+    function detectLoop() {
       if (video.readyState >= 2 && video.currentTime !== lastTime) {
         lastTime = video.currentTime;
         const res = landmarker.detectForVideo(video, performance.now());
         if (res.faceLandmarks && res.faceLandmarks.length > 0) {
-          const face = res.faceLandmarks.at(0);
-          const nose = face.at(1);
-          const nx = 1 - nose.x;
-          const ny = nose.y;
-
-          noseEl.style.left = (nx * window.innerWidth) + "px";
-          noseEl.style.top = (ny * window.innerHeight) + "px";
-
-          if (!calibrated) { refX = nx; refY = ny; smoothX = nx; smoothY = ny; calibrated = true; }
-          smoothX = smoothX * 0.72 + nx * 0.28;
-          smoothY = smoothY * 0.72 + ny * 0.28;
-
-          const tx = Math.max(15, Math.min(window.innerWidth - 15, ((smoothX - refX) * 6.5 + 0.5) * window.innerWidth));
-          const ty = Math.max(15, Math.min(window.innerHeight - 15, ((smoothY - refY) * 8.0 + 0.5) * window.innerHeight));
-
-          if (Math.abs(tx - cx) > 10) cx += (tx - cx) * 0.25;
-          if (Math.abs(ty - cy) > 10) cy += (ty - cy) * 0.25;
+          const nose = res.faceLandmarks.at(0).at(1);
+          window.actualizeazaNas(1 - nose.x, nose.y);
         }
       }
-
-      cursorEl.style.left = cx + "px"; cursorEl.style.top = cy + "px";
-      ringEl.style.left = cx + "px"; ringEl.style.top = cy + "px";
-
-      let hit = null;
-      document.querySelectorAll(".key").forEach(el => {
-        const r = el.getBoundingClientRect();
-        if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) { el.classList.add("active"); hit = el.getAttribute("data-act"); }
-        else el.classList.remove("active");
-      });
-
-      const now = performance.now();
-      if (hit) {
-        if (hit !== currentKey) { currentKey = hit; hoverStart = now; }
-        else {
-          const prog = Math.min(1, (now - hoverStart) / DWELL_MS);
-          ringEl.style.borderColor = "#00e6ff";
-          ringEl.style.transform = `translate(-50%, -50%) scale(${1.3 - prog * 0.6})`;
-          if (prog >= 1) { triggerAction(hit); hoverStart = now + 700; }
-        }
-      } else { currentKey = null; ringEl.style.borderColor = "transparent"; }
-
-      requestAnimationFrame(loop);
+      requestAnimationFrame(detectLoop);
     }
-    loop();
+    detectLoop();
   } catch (e) {
-    status.textContent = "Eroare: " + e.message;
+    status.textContent = "Eroare AI: " + e.message;
   }
 }
-init();
+pornesteAI();
 </script>
 </body>
 </html>
