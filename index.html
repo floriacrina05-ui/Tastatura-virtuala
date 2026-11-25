@@ -40,13 +40,13 @@
 <script>
 var dict = ["SALUT","BUNA","MULTUMESC","AJUTOR","APA","MANCARE","DA","NU","VREAU","TE ROG","MA DOARE","SUNT BINE","OBOSIT","SOMN","FRIG","CALD"];
 var rows = [["Q","W","E","R","T","Y","U","I","O","P"],["A","S","D","F","G","H","J","K","L","STERGE"],["Z","X","C","V","B","N","M","SPATIU","VORBESTE","GOLESTE"]];
-var text = "", cx = window.innerWidth / 2, cy = window.innerHeight / 2, refX = 0.5, refY = 0.5, lastFaceX = 0.5, lastFaceY = 0.5, calibrated = false, currentKey = null, hoverStart = 0, DWELL_MS = 1150;
+var text = "", cx = window.innerWidth / 2, cy = window.innerHeight / 2, refX = 0.5, refY = 0.5, lastFaceX = 0.5, lastFaceY = 0.5, smoothX = 0.5, smoothY = 0.5, calibrated = false, currentKey = null, hoverStart = 0, DWELL_MS = 1150;
 function speak(msg) { if (!msg.trim()) return; if ('speechSynthesis' in window) { window.speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(msg); u.lang = "ro-RO"; u.rate = 0.95; window.speechSynthesis.speak(u); } }
 function getSuggestions() { var parts = text.split(" "), last = parts[parts.length - 1]; if (!last) return ["SALUT","DA","NU"]; var res = dict.filter(function(w) { return w.indexOf(last) === 0 && w !== last; }).slice(0, 3); var defs = ["APA","AJUTOR","MULTUMESC"]; for (var i = 0; i < defs.length; i++) { if (res.length < 3 && res.indexOf(defs[i]) === -1) res.push(defs[i]); } return res; }
 function makeKey(label, cls, act) { var d = document.createElement("div"); d.className = "key " + cls; d.textContent = label; d.setAttribute("data-act", act); return d; }
 function renderTopRow() { var top = document.getElementById("row-top"); top.innerHTML = ""; top.appendChild(makeKey("CENTREAZA", "calib", "CALIB")); var sugs = getSuggestions(); for (var i = 0; i < sugs.length; i++) top.appendChild(makeKey(sugs[i], "sug", "SUG:" + sugs[i])); }
 function buildKeyboard() { renderTopRow(); for (var r = 0; r < rows.length; r++) { var rowEl = document.getElementById("row-" + (r + 1)); rowEl.innerHTML = ""; for (var c = 0; c < rows[r].length; c++) { var k = rows[r][c], cls = (k === "VORBESTE" || k === "SPATIU") ? "special" : ((k === "STERGE" || k === "GOLESTE") ? "danger" : ""); rowEl.appendChild(makeKey(k, cls, k)); } } }
-function triggerAction(act) { if (act === "CALIB") { refX = lastFaceX; refY = lastFaceY; cx = window.innerWidth / 2; cy = window.innerHeight / 2; } else if (act.indexOf("SUG:") === 0) { var parts = text.split(" "); parts[parts.length - 1] = act.slice(4); text = parts.join(" ") + " "; renderTopRow(); } else if (act === "SPATIU") { text += " "; renderTopRow(); } else if (act === "STERGE") { text = text.slice(0, -1); renderTopRow(); } else if (act === "GOLESTE") { text = ""; renderTopRow(); } else if (act === "VORBESTE") { speak(text); } else { text += act; renderTopRow(); } document.getElementById("text").textContent = text; }
+function triggerAction(act) { if (act === "CALIB") { refX = smoothX; refY = smoothY; cx = window.innerWidth / 2; cy = window.innerHeight / 2; } else if (act.indexOf("SUG:") === 0) { var parts = text.split(" "); parts[parts.length - 1] = act.slice(4); text = parts.join(" ") + " "; renderTopRow(); } else if (act === "SPATIU") { text += " "; renderTopRow(); } else if (act === "STERGE") { text = text.slice(0, -1); renderTopRow(); } else if (act === "GOLESTE") { text = ""; renderTopRow(); } else if (act === "VORBESTE") { speak(text); } else { text += act; renderTopRow(); } document.getElementById("text").textContent = text; }
 function startApp() {
   var status = document.getElementById("status-bar");
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { status.textContent = "Necesita HTTPS"; return; }
@@ -54,8 +54,17 @@ function startApp() {
     var video = document.getElementById("video-bg"); video.srcObject = stream; video.play();
     var canvas = document.getElementById("c1"), ctx = canvas.getContext("2d", { willReadFrequently: true }), cursorEl = document.getElementById("cursor"), ringEl = document.getElementById("ring");
     var hasNative = ('FaceDetector' in window), nativeDet = hasNative ? new FaceDetector({ fastMode: true, maxDetectedFaces: 1 }) : null, busy = false;
-    status.textContent = hasNative ? "Micro-Tracking AI" : "Micro-Tracking Activ";
-    function updatePos(nx, ny) { lastFaceX = nx; lastFaceY = ny; if (!calibrated) { refX = nx; refY = ny; calibrated = true; } var tx = Math.max(15, Math.min(window.innerWidth - 15, ((nx - refX) * 9.5 + 0.5) * window.innerWidth)), ty = Math.max(15, Math.min(window.innerHeight - 15, ((ny - refY) * 10.5 + 0.5) * window.innerHeight)); if (Math.abs(tx - cx) > 6) cx += (tx - cx) * 0.28; if (Math.abs(ty - cy) > 6) cy += (ty - cy) * 0.28; }
+    status.textContent = hasNative ? "Stabilizare AI Activa" : "Stabilizare Activa";
+    function updatePos(nx, ny) {
+      lastFaceX = nx; lastFaceY = ny;
+      if (!calibrated) { refX = nx; refY = ny; smoothX = nx; smoothY = ny; calibrated = true; }
+      smoothX = smoothX * 0.78 + nx * 0.22;
+      smoothY = smoothY * 0.78 + ny * 0.22;
+      var tx = Math.max(15, Math.min(window.innerWidth - 15, ((smoothX - refX) * 7.5 + 0.5) * window.innerWidth));
+      var ty = Math.max(15, Math.min(window.innerHeight - 15, ((smoothY - refY) * 8.5 + 0.5) * window.innerHeight));
+      if (Math.abs(tx - cx) > 16) cx += (tx - cx) * 0.18;
+      if (Math.abs(ty - cy) > 16) cy += (ty - cy) * 0.18;
+    }
     function loop() {
       if (video.readyState >= 2 && !busy) {
         if (nativeDet) { busy = true; nativeDet.detect(video).then(function(f) { if (f.length > 0) { var b = f.boundingBox; updatePos(1 - ((b.x + b.width / 2) / video.videoWidth), (b.y + b.height / 2) / video.videoHeight); } busy = false; }).catch(function() { busy = false; }); }
